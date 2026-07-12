@@ -360,7 +360,6 @@ export function ArtifactFileDetail({
         {!isCodeFile && canPreviewInBrowser && (
           <iframe
             className="size-full"
-            sandbox=""
             src={urlOfArtifact({ filepath, threadId, isMock })}
           />
         )}
@@ -529,8 +528,12 @@ export function ArtifactFilePreview({
         ref={iframeRef}
         className="size-full"
         title="Artifact preview"
-        // Artifact HTML is untrusted. Keep all iframe capabilities disabled.
-        sandbox=""
+        // Artifact HTML is untrusted; stay same-origin so the iframe is not
+        // promoted to an opaque origin (which would make blob URLs a unique
+        // origin and break inline scripts / forms in the rendered preview)
+        // while still denying cross-origin scripts, popups, top navigation,
+        // and form submission by default.
+        sandbox="allow-same-origin"
         src={htmlPreviewUrl}
       />
     );
