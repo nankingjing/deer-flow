@@ -1666,6 +1666,15 @@ export function useThreadHistory(
           },
           credentials: "include",
         }).then((res) => {
+          // 5xx/404 responses would otherwise be parsed as JSON and the real
+          // status swallowed. Surface the failure to TanStack Query so
+          // `isError` flips on the caller side and we stop pretending the
+          // thread has an empty history.
+          if (!res.ok) {
+            throw new Error(
+              `run messages fetch failed: ${res.status} ${res.statusText}`,
+            );
+          }
           return res.json();
         });
         if (
