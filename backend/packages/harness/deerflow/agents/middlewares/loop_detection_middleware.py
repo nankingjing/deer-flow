@@ -245,8 +245,8 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         # the freq thresholds, e.g. 20 < hard 50); size the frequency window to
         # the largest hard limit in play (global + every per-tool override) so a
         # tight burst can actually reach it while spread-out calls still decay
-        # out of the window. Warn thresholds are intentionally excluded: a sane
-        # config enforces warn <= hard (covered by sizing to hard), and a misconfig
+        # out of the window. Warn thresholds are intentionally excluded: the config
+        # enforces warn <= hard (covered by sizing to hard), and a misconfig
         # with warn > hard would hard-stop first anyway, so an unreachable warn
         # is harmless and must not inflate the window.
         self._tool_freq_window = max(
