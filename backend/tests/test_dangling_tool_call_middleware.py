@@ -536,6 +536,16 @@ class TestBuildPatchedMessagesPatching:
         assert isinstance(patched[1], ToolMessage)
         assert patched[1].tool_call_id == "call_1"
 
+    def test_all_orphan_messages_returns_none(self):
+        """When every message in the transcript is an orphan ToolMessage,
+        _build_patched_messages must return None so the caller passes the
+        original messages through rather than sending an empty list to the
+        model (which would produce a different, equally unhelpful error)."""
+        mw = DanglingToolCallMiddleware()
+        msgs = [_tool_msg("ghost_1", "result1"), _tool_msg("ghost_2", "result2")]
+        patched = mw._build_patched_messages(msgs)
+        assert patched is None
+
     def test_invalid_tool_call_is_patched(self):
         mw = DanglingToolCallMiddleware()
         msgs = [_ai_with_invalid_tool_calls([_invalid_tc()])]
