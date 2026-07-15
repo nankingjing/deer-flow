@@ -1,5 +1,7 @@
 import asyncio
 import threading
+import json
+import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from deerflow.agents.memory.prompt import format_conversation_for_update
@@ -1464,12 +1466,7 @@ class TestParseMemoryUpdateFactsToRemoveGate:
         assert any(fact.get("content") == "User likes Rust" for fact in parsed.get("newFacts", []))
 
     def test_still_rejects_decoy_object_missing_history_and_new_facts(self):
-        import json
-
         # ``{"user": "alice"}`` has only the ``user`` key — missing history+newFacts,
         # so it must never be mistaken for a memory update.
-        try:
+        with pytest.raises(json.JSONDecodeError):
             _parse_memory_update_response('{"user": "alice"}')
-        except json.JSONDecodeError:
-            return
-        raise AssertionError('decoy object {"user": "alice"} must be rejected')
