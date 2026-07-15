@@ -51,12 +51,12 @@ class LoopDetectionConfig(BaseModel):
     tool_freq_warn: int = Field(
         default=30,
         ge=1,
-        description="Number of calls to the same tool type before injecting a frequency warning",
+        description="Maximum number of calls to the same tool type within the per-thread sliding window before injecting a frequency warning. The window is sized to the largest configured hard limit so a burst can reach the threshold while spaced-out calls decay out of the window.",
     )
     tool_freq_hard_limit: int = Field(
         default=50,
         ge=1,
-        description="Number of calls to the same tool type before forcing a stop",
+        description="Maximum number of calls to the same tool type within the per-thread sliding window before forcing a stop. Only recent calls within the window are counted — spacing out tool usage naturally avoids tripping the limit.",
     )
     tool_freq_overrides: dict[str, ToolFreqOverride] = Field(
         default_factory=dict,
