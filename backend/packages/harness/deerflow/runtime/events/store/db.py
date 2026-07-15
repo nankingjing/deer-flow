@@ -28,10 +28,12 @@ class DbRunEventStore(RunEventStore):
         self._sf = session_factory
         self._max_trace_content = max_trace_content
         # Per-thread asyncio locks serialize seq assignment for concurrent
-        # in-process writers on the same thread. The DB-level FOR UPDATE /
-        # advisory lock guards cross-process races; this guards the common
-        # single-process case where two coroutines interleave between the
-        # max(seq) read and the INSERT and would otherwise collide on seq.
+        # in-process writers on the same thread. For Postgres, the DB-level
+        # advisory lock (pg_advisory_xact_lock) already serializes same-thread
+        # writers across both processes and coroutines; for SQLite (where
+        # SELECT ... FOR UPDATE is silently ignored by the engine), this lock
+        # provides the sole serialisation between in-process coroutines that
+        # would otherwise race between the max(seq) read and the INSERT.
         self._write_locks: dict[str, asyncio.Lock] = {}
 
     def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
