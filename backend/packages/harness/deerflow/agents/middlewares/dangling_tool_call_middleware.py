@@ -224,10 +224,15 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         return msg.model_copy(update=update)
 
     def _build_patched_messages(self, messages: list) -> list | None:
-        """Return messages with tool results grouped after their tool-call AIMessage.
+        """Return messages with tool results grouped after their tool-call AIMessage,
+        and orphan ToolMessages dropped.
 
-        This normalizes model-bound causal order before provider serialization while
-        preserving already-valid transcripts unchanged.
+        This normalizes model-bound causal order before provider serialization:
+        - ToolMessages are moved to immediately follow their originating AIMessage.
+        - Orphan ToolMessages (tool results whose AIMessage tool_call is no longer
+          present in the request, e.g. removed by summarization) are dropped so
+          strict OpenAI-compatible providers do not reject the request with HTTP 400.
+        - Already-valid transcripts are returned unchanged.
         """
         tool_messages_by_id: dict[str, deque[ToolMessage]] = defaultdict(deque)
         for msg in messages:
