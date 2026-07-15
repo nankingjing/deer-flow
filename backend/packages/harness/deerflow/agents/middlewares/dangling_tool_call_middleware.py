@@ -292,6 +292,11 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
                     )
                     patch_count += 1
 
+
+        # Guard: every message was an orphan — avoid forwarding an empty
+        # transcript to the model (which would be a new failure mode).
+        if not patched and messages:
+            return None
         if patched == messages and not drop_count:
             return None
         if drop_count or patch_count:
