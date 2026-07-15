@@ -78,8 +78,8 @@ _DEFAULT_WARN_THRESHOLD = 3  # inject warning after 3 identical calls
 _DEFAULT_HARD_LIMIT = 5  # force-stop after 5 identical calls
 _DEFAULT_WINDOW_SIZE = 20  # track last N tool calls
 _DEFAULT_MAX_TRACKED_THREADS = 100  # LRU eviction limit
-_DEFAULT_TOOL_FREQ_WARN = 30  # warn after 30 calls to the same tool type
-_DEFAULT_TOOL_FREQ_HARD_LIMIT = 50  # force-stop after 50 calls to the same tool type
+_DEFAULT_TOOL_FREQ_WARN = 30  # warn after N calls to the same tool type within the sliding window
+_DEFAULT_TOOL_FREQ_HARD_LIMIT = 50  # force-stop after N calls to the same tool type within the sliding window
 _MAX_PENDING_WARNINGS_PER_RUN = 4
 
 
@@ -199,14 +199,17 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             Default: 20.
         max_tracked_threads: Maximum number of threads to track before
             evicting the least recently used. Default: 100.
-        tool_freq_warn: Maximum number of same-tool-type calls within a
-            sliding window of ``_tool_freq_window`` before injecting a
-            frequency warning. Catches cross-file read loops that
-            hash-based detection misses. Default: 30 (within a window
-            of 50).
-        tool_freq_hard_limit: Maximum number of same-tool-type calls within
-            a sliding window of ``_tool_freq_window`` before forcing a
-            stop. Default: 50 (within a window of 50).
+        tool_freq_warn: Maximum number of same-tool-type calls within
+            a per-thread sliding window before injecting a frequency
+            warning. The window is sized to the largest configured hard
+            limit so a burst can reach the threshold while spaced-out
+            calls decay out of the window. Catches cross-file read
+            loops that hash-based detection misses. Default: 30.
+        tool_freq_hard_limit: Maximum number of same-tool-type calls
+            within the same per-thread sliding window before forcing a
+            stop. Like ``tool_freq_warn``, only recent calls in the
+            window are counted — spacing out tool usage naturally
+            avoids tripping the limit. Default: 50.
         tool_freq_overrides: Per-tool overrides for frequency thresholds,
             keyed by tool name. Each value is a ``(warn, hard_limit)`` tuple
             that replaces ``tool_freq_warn`` / ``tool_freq_hard_limit`` for
