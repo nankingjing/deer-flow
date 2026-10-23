@@ -1076,6 +1076,96 @@ def test_ls_tool_keeps_category_dirs_when_listing_skills_root(tmp_path, monkeypa
     assert "secret-skill" not in result
 
 
+@pytest.mark.parametrize("exc_type", [RuntimeError, AttributeError, TypeError])
+def test_disabled_skill_guard_denies_when_enabled_state_lookup_raises(tmp_path, monkeypatch, exc_type) -> None:
+    """The guard used to list (OSError, ValueError, KeyError, JSONDecodeError).
+    ``ExtensionsConfig._from_path_with_signature`` re-raises every non-JSON load
+    failure as ``RuntimeError``, so a schema-drifted ``extensions_config.json``
+    escaped that tuple.  The fail-closed contract says any failure to determine
+    the state must deny, whatever the type.
+    """
+    from deerflow.config.extensions_config import ExtensionsConfig
+    from deerflow.sandbox.tools import _is_disabled_skill_path
+
+    _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
+
+    def _raise(cls, *args, **kwargs):
+        raise exc_type("drifted extensions_config.json")
+
+    monkeypatch.setattr(ExtensionsConfig, "from_file", classmethod(_raise))
+
+    assert _is_disabled_skill_path("/mnt/skills/public/open-skill/SKILL.md") is True
+
+
+def test_disabled_skill_guard_denies_on_a_real_drifted_config_file(tmp_path, monkeypatch) -> None:
+    """End-to-end: a schema-drifted extensions_config.json on disk makes
+    ``ExtensionsConfig.from_file`` raise ``RuntimeError``, and the guard must
+    deny instead of letting it escape to the tool wrappers."""
+    import json as _json
+
+    from deerflow.config.extensions_config import ExtensionsConfig
+    from deerflow.sandbox.tools import _is_disabled_skill_path
+
+    _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
+
+    drifted = tmp_path / "drifted-extensions-config.json"
+    drifted.write_text(_json.dumps({"skills": {"open-skill": "not-a-mapping"}}), encoding="utf-8")
+    monkeypatch.setattr(ExtensionsConfig, "resolve_config_path", classmethod(lambda cls, p=None: drifted))
+
+    # Control: the loader really does raise, so the guard is what saves us.
+    with pytest.raises(RuntimeError):
+        ExtensionsConfig.from_file()
+
+    assert _is_disabled_skill_path("/mnt/skills/public/open-skill/SKILL.md") is True
+
+
+def test_disabled_skill_guard_control_still_allows_enabled_skill(tmp_path, monkeypatch) -> None:
+    """Control: with a well-formed config the widened guard changes nothing."""
+    from deerflow.sandbox.tools import _is_disabled_skill_path
+
+    _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
+
+    assert _is_disabled_skill_path("/mnt/skills/public/open-skill/SKILL.md") is False
+    assert _is_disabled_skill_path("/mnt/skills/public/secret-skill/SKILL.md") is True
+
+
+@pytest.mark.parametrize("tool_name", ["read_file", "ls", "glob", "grep"])
+def test_tools_report_disabled_skill_when_enabled_state_lookup_raises(tmp_path, monkeypatch, tool_name) -> None:
+    """Every sandbox tool must surface the normal "disabled" error, not an
+    "Unexpected error" from an exception the guard let escape."""
+    from deerflow.config.extensions_config import ExtensionsConfig
+    from deerflow.sandbox.tools import read_file_tool
+
+    runtime = _make_runtime(tmp_path)
+    _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
+
+    def _raise(cls, *args, **kwargs):
+        raise AttributeError("drifted extensions_config.json")
+
+    monkeypatch.setattr(ExtensionsConfig, "from_file", classmethod(_raise))
+
+    if tool_name == "read_file":
+        result = read_file_tool.func(runtime=runtime, path="/mnt/skills/public/open-skill/SKILL.md", description="read skill")
+    elif tool_name == "ls":
+        result = ls_tool.func(runtime=runtime, path="/mnt/skills/public/open-skill", description="list skill")
+    elif tool_name == "glob":
+        result = glob_tool.func(
+            runtime=runtime,
+            description="find skill files",
+            pattern="**/*.md",
+            path="/mnt/skills/public/open-skill",
+        )
+    else:
+        result = grep_tool.func(
+            runtime=runtime,
+            description="search skill files",
+            pattern="PROCEDURE",
+            path="/mnt/skills/public/open-skill",
+        )
+
+    assert "Error: Skill 'open-skill' is disabled" in result
+
+
 def test_extract_skill_name_treats_category_dir_with_trailing_slash_as_root() -> None:
     """LocalSandbox.list_dir appends "/" to directories, so the gate sees
     "/mnt/skills/public/" — which must resolve to None (category root), not "".

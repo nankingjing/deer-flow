@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import ntpath
 import os
@@ -307,12 +306,23 @@ def _is_disabled_skill_path(path: str, *, user_id: str | None = None) -> bool:
             effective_uid = user_id or get_effective_user_id()
             storage = get_or_new_user_skill_storage(effective_uid)
             return not storage.get_skill_enabled_state(skill_name)
-    except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
+    except Exception as exc:
         # Access-control check must fail closed: when we can't determine the
         # enabled state (corrupt _skill_states.json, mid-write race, missing
         # config), refuse access rather than silently serving a disabled
         # skill's files. See review feedback on PR #3889.
-        logger.warning("Failed to determine enabled state, denying access: %s", exc)
+        #
+        # This catch is deliberately broad: an enabled-state lookup can fail in
+        # ways no short list anticipates.  ExtensionsConfig.from_file already
+        # wraps every non-JSON load failure in a RuntimeError, which the old
+        # tuple missed, and other callers can surface AttributeError/TypeError
+        # from a schema-drifted config.  All of them must deny.  Catching
+        # Exception, not BaseException, keeps KeyboardInterrupt/SystemExit out.
+        logger.warning(
+            "Failed to determine enabled state (%s), denying access: %s",
+            type(exc).__name__,
+            exc,
+        )
         return True
 
 
