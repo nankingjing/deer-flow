@@ -829,9 +829,7 @@ As of 2026-10-21, the milestone includes **829 merged pull requests**.
   or partially written files no longer raise `MemoryStorageCorruption` and crash
   the agent: a Markdown summary is understood via a lossless fenced
   `memory-json` block with a best-effort structured fallback, and plain JSON
-  still loads. The on-disk JSON format and the JSON UI are unchanged, and writes
-  remain journaled JSON — this ships read-path tolerance only; a full Markdown
-  write path is a follow-up. ([#5545])
+  still loads. The on-disk JSON format and the JSON UI are unchanged. ([#5545])
 - **memory:** Add a deterministic DeerMem scope-isolation benchmark under
   `backend/scripts/benchmark/deermem_scope_isolation`. The opt-in
   validate/run/report workflow exercises lifecycle durability, concurrent
@@ -1396,6 +1394,15 @@ As of 2026-10-21, the milestone includes **829 merged pull requests**.
   existing secret and user isolation boundaries are retained. ([#6935])
 
 ### Fixed
+
+- **memory:** The opt-in `memory.storage_class: markdown` backend now writes
+  Markdown, completing the write path that [#5545] deferred. Summaries are
+  published as a document whose fenced `memory-json` block carries the manifest
+  verbatim, so enabling the backend no longer leaves JSON files on disk. Only
+  the encoding changed: the atomic publish, operation journal,
+  `expected_revision` checks and corruption/quarantine behaviour stay in the
+  base class, and the default JSON backend's on-disk bytes are unchanged.
+  ([#5545])
 
 - **sandbox:** Release an E2B VM's ownership lease when acquire finds it gone
   (a dead cached client or a warm-pool VM reaped while parked). The lease was

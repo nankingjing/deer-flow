@@ -146,10 +146,12 @@ existing enabled behavior.
 #### DeerMem storage contract
 
 `memory.backend_config.storage_class: markdown` opts into tolerant summary
-reads; writes still use JSON. Only a JSON object in a closed `memory-json`
-fence is accepted from Markdown. Decode the value before checking its closing
-fence so embedded backticks and later fenced notes stay lossless. Parser and
-storage regressions belong in `tests/test_memory_storage.py`; configure a data
+reads and Markdown writes; the manifest is published as Markdown whose closed
+`memory-json` fence carries the lossless value. Only a JSON object in a closed
+`memory-json` fence is accepted from Markdown. Decode the value before checking
+its closing fence so embedded backticks and later fenced notes stay lossless.
+Parser and storage regressions belong in `tests/test_memory_storage.py`; write
+path regressions in `tests/test_markdown_memory_write_path.py`; configure a data
 root directory, not the existing manifest file. Legacy v1 reads still migrate
 and advance the revision. Invalid UTF-8 bytes and unparseable summary text are
 quarantined before rebuild. Summary read `OSError`s raise `MemoryStorageCorruption`

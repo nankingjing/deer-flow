@@ -5,8 +5,8 @@ single JSON document. Reasoning/thinking models occasionally emit malformed
 JSON, and a partially written summary historically raised
 ``MemoryStorageCorruption`` and took down the whole agent.
 
-``MarkdownMemoryStorage`` keeps the same on-disk JSON as the default for full
-backward compatibility, but its loader is *tolerant*:
+``MarkdownMemoryStorage`` still accepts the default backend's JSON, so an
+existing ``memory.json`` keeps loading, but its loader is *tolerant*:
 
 * a corrupt or partially written summary no longer crashes the agent;
 * a Markdown summary is accepted only through its fenced ```` ```memory-json ````
@@ -21,10 +21,11 @@ backward compatibility, but its loader is *tolerant*:
   the default storage error contract. The original file stays in place, and
   reads and writes can be retried after access recovers.
 
-Writes still persist JSON (the write path is untouched). Hand-edited
-Markdown files are therefore a *read-time* convenience: the next write
-rewrites ``memory.json`` as JSON, so the Markdown rendering is temporary
-until a Markdown write path lands.
+Writes publish the same manifest as a Markdown document whose fenced
+```` ```memory-json ```` block is lossless, so the file this backend produces
+is the file it accepts. Only the encoding changes: the base class still owns
+the atomic temp-file-then-rename publish and the operation journal, and
+``expected_revision`` and corruption handling are unchanged.
 
 The tolerant decoding policy is scoped to this opt-in loader. Summary I/O
 failures use the same storage error contract as the default backend.
@@ -37,18 +38,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .markdown_format import _parse_markdown_memory
+from .markdown_format import _parse_markdown_memory, _render_markdown_memory
 from .storage import FileMemoryStorage, MemoryStorageCorruption, logger
 
 
 class MarkdownMemoryStorage(FileMemoryStorage):
-    """File-backed storage whose summary loader tolerates corrupt/Markdown.
+    """File-backed storage whose summary format is tolerant Markdown.
 
     Fully opt-in. Enable via ``memory.backend_config.storage_class: markdown`` (or the full
     import path ``deerflow.agents.memory.backends.deermem.deermem.core.
-    markdown_storage.MarkdownMemoryStorage``). The default JSON summary
-    format is unchanged, so the existing JSON UI and all other backends keep
-    working.
+    markdown_storage.MarkdownMemoryStorage``). Only this opt-in backend
+    publishes Markdown; the default JSON storage class, its on-disk format and
+    the existing JSON UI are unchanged.
     """
 
     def _load_memory_file(self, path: Path) -> dict[str, Any] | None:
@@ -94,6 +95,11 @@ class MarkdownMemoryStorage(FileMemoryStorage):
         )
         self._quarantine_unreadable(path)
         return None
+
+    def _serialize_memory_file(self, memory_file: dict[str, Any]) -> bytes:
+        # Pairs with _load_memory_file: the same manifest is published as
+        # Markdown, while the base class keeps the atomic publish and journal.
+        return _render_markdown_memory(memory_file).encode("utf-8")
 
     @staticmethod
     def _quarantine_unreadable(path: Path) -> None:

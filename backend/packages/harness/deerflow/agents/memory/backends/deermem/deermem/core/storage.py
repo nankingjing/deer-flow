@@ -1271,6 +1271,15 @@ class FileMemoryStorage(MemoryStorage):
             raise MemoryStorageCorruption(f"Global memory JSON {path} is not an object")
         return value
 
+    @staticmethod
+    def _serialize_memory_file(memory_file: dict[str, Any]) -> bytes:
+        """Encode the summary manifest for its published file.
+
+        Paired with ``_load_memory_file``: the opt-in Markdown backend
+        overrides both so its on-disk encoding lands in the same atomic publish.
+        """
+        return json.dumps(memory_file, ensure_ascii=False, indent=2).encode("utf-8")
+
     def _recover_if_needed(self, path: Path) -> None:
         """Recover or clean a previously journaled multi-file operation.
 
@@ -1455,7 +1464,7 @@ class FileMemoryStorage(MemoryStorage):
             "user": user_section,
             "history": history_section,
         }
-        _atomic_write(path, json.dumps(memory_file, ensure_ascii=False, indent=2).encode("utf-8"))
+        _atomic_write(path, self._serialize_memory_file(memory_file))
         journal["state"] = "committed"
         _atomic_write(journal_path, json.dumps(journal, ensure_ascii=False, indent=2).encode("utf-8"))
         shutil.rmtree(recovery_dir, ignore_errors=True)
